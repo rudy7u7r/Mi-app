@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2ecc71">
+    <meta charset="UTF-8">
+    <title>EcoSorno</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3fff3;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            background: #2e8b57;
+            color: white;
+            width: 100%;
+            text-align: center;
+            padding: 15px 0;
+            margin: 0;
+        }
+
+        #map {
+            height: 450px;
+            width: 85%;
+            margin-top: 20px;
+            border-radius: 10px;
+            border: 3px solid #2e8b57;
+        }
+
+        #buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            background: #2e8b57;
+            color: white;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #3fa96e;
+        }
+
+        /* Ventanas emergentes (modales) */
+        .modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            width: 300px;
+            border-radius: 12px;
+            text-align: center;
+             z-index: 10000;
+        }
+
+        .close {
+            float: right;
+            cursor: pointer;
+            color: red;
+            font-size: 18px;
+        }
+
+    </style>
+
+    <!-- Leaflet (mapa) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+<h1>EcoSorno</h1>
+
+<div id="map"></div>
+
+<div id="buttons">
+    <button onclick="openModal('modalContador')">Contar basura</button>
+    <button onclick="openModal('modalEstadisticas')">Ver estadísticas</button>
+</div>
+
+<!-- MODAL: Contador -->
+<div class="modal" id="modalContador">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('modalContador')">&times;</span>
+        <h3>Basura reciclada esta semana</h3>
+        <h2 id="contador">0</h2>
+        <button onclick="sumarBasura()">Agregar 1</button>
+        <button onclick="resetBasura()">Reiniciar</button>
+    </div>
+</div>
+
+<!-- MODAL: Estadísticas -->
+<div class="modal" id="modalEstadisticas">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('modalEstadisticas')">&times;</span>
+        <h3>Estadísticas</h3>
+        <p>Total semanal: <b id="estadisticaTotal">0</b></p>
+        <p>Marcadores creados: <b id="estadisticaPuntos">0</b></p>
+    </div>
+</div>
+
+<script>
+    // ---- MAPA ----
+    const osornoCoords = [-40.574, -73.133]; // Osorno, Chile
+
+    const map = L.map('map').setView(osornoCoords, 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+    }).addTo(map);
+
+    let marcadores = 0;
+
+    // Click en el mapa = agregar marcador + abrir popup editable
+    map.on('click', function(e) {
+        const marker = L.marker(e.latlng).addTo(map);
+
+        marcadores++;
+
+        marker.bindPopup(`
+            <b>Punto marcado</b><br>
+            Lat: ${e.latlng.lat.toFixed(5)}<br>
+            Lng: ${e.latlng.lng.toFixed(5)}<br><br>
+            <input type="text" placeholder="Nombre del punto" id="nombre_${marcadores}">
+        `).openPopup();
+
+        document.getElementById("estadisticaPuntos").textContent = marcadores;
+    });
+
+    // ---- MODALES ----
+    function openModal(id) {
+        document.getElementById(id).style.display = "flex";
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = "none";
+    }
+
+    // ---- CONTADOR ----
+    let basura = 0;
+
+    function sumarBasura() {
+        basura++;
+        actualizarContadores();
+    }
+
+    function resetBasura() {
+        basura = 0;
+        actualizarContadores();
+    }
+
+    function actualizarContadores() {
+        document.getElementById("contador").textContent = basura;
+        document.getElementById("estadisticaTotal").textContent = basura;
+    }
+
+</script>
+
+</body>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+</html>
