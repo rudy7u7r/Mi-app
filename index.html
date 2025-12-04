@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EcoSorno</title>
+
+  <!-- favicon / app manifest -->
+  <link rel="icon" type="image/png" href="IconApp.png">
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2ecc71">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --green-600:#2e8b57;
+      --green-500:#39a86a;
+      --bg:#f3fff3;
+      --card:#ffffff;
+      --muted:#6b7280;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter, Arial, sans-serif;
+      background:var(--bg);
+      color:#0f172a;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      min-height:100vh;
+    }
+
+    /* Header */
+    header.app-header{
+      width:100%;
+      background: linear-gradient(90deg,var(--green-600),var(--green-500));
+      color:white;
+      padding:12px 16px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      box-shadow:0 3px 12px rgba(0,0,0,0.08);
+    }
+    header.app-header img.logo {
+      height:44px;
+      width:44px;
+      border-radius:8px;
+      object-fit:cover;
+      border:2px solid rgba(255,255,255,0.12);
+    }
+    header.app-header h1{
+      font-size:20px;
+      margin:0;
+      letter-spacing:0.2px;
+    }
+    header.app-header .actions {
+      margin-left:auto;
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    header.app-header button.small {
+      background:rgba(255,255,255,0.12);
+      color:white;
+      border:0;
+      padding:8px 12px;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:600;
+    }
+
+    /* Content */
+    .wrap{
+      width:100%;
+      max-width:1100px;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .card{
+      background:var(--card);
+      border-radius:12px;
+      padding:12px;
+      box-shadow:0 6px 20px rgba(9,30,66,0.04);
+    }
+
+    /* Map */
+    #map{
+      height:480px;
+      width:100%;
+      border-radius:10px;
+      border:2px solid var(--green-600);
+    }
+
+    /* Buttons under map */
+    .controls {
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      margin-top:10px;
+    }
+    .controls button{
+      background:var(--green-600);
+      color:white;
+      padding:10px 16px;
+      border-radius:10px;
+      border:0;
+      cursor:pointer;
+      font-weight:700;
+      box-shadow: 0 6px 12px rgba(46,139,87,0.12);
+    }
+    .controls button.ghost{
+      background:#fff;
+      color:var(--green-600);
+      border:1px solid rgba(46,139,87,0.12);
+    }
+
+    /* Modal dashboard (big) */
+    .modal {
+      position:fixed;
+      inset:0;
+      background:rgba(2,6,23,0.55);
+      display:none;
+      justify-content:center;
+      align-items:center;
+      z-index:9999;
+      padding:20px;
+    }
+    .modal.open { display:flex; }
+    .modal .modal-body{
+      width:100%;
+      max-width:1000px;
+      background:white;
+      border-radius:14px;
+      padding:18px;
+      box-shadow:0 20px 50px rgba(2,6,23,0.35);
+      max-height:90vh;
+      overflow:auto;
+    }
+    .modal .modal-body .row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+
+    .panel {
+      flex:1 1 300px;
+      min-height:160px;
+      background:linear-gradient(180deg,#fff,#fbfffb);
+      border-radius:10px;
+      padding:12px;
+      box-shadow:0 6px 18px rgba(9,30,66,0.04);
+    }
+
+    .panel h3{ margin:0 0 6px 0; font-size:15px;}
+    .panel canvas{ width:100%!important; height:220px!important; }
+
+    /* table */
+    table { width:100%; border-collapse:collapse; font-size:14px;}
+    th,td { padding:8px 6px; text-align:left; border-bottom:1px solid #eee; }
+    th { color:var(--muted); font-weight:700; font-size:13px; }
+
+    /* responsive */
+    @media (max-width:900px){
+      header.app-header h1{font-size:18px}
+      #map{height:360px;}
+      .panel { min-height:140px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="app-header">
+    <img class="logo" src="IconApp.png" alt="EcoSorno">
+    <h1>EcoSorno</h1>
+
+    <div class="actions">
+      <button class="small" onclick="openDashboard()">Dashboard</button>
+      <button class="small" onclick="centrarUsuario()">Ir a mi ubicación</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="card">
+      <div id="map"></div>
+      <div class="controls">
+        <button onclick="openModal('modalContador')">Contar basura</button>
+        <button onclick="openDashboard()">Ver estadísticas</button>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+      <div style="flex:1">
+        <strong>Esta semana:</strong> <span id="semanaResumen">0 kg reciclados</span>
+      </div>
+      <div style="width:240px;text-align:right;color:var(--muted)">
+        <small>Registros guardados en localStorage.</small>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODALES PEQUEÑOS -->
+  <div class="modal" id="modalContador" aria-hidden="true">
+    <div class="modal-body" style="max-width:420px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0">Contador semanal</h2>
+        <button onclick="closeModal('modalContador')" style="border:0;background:#ff6161;color:white;padding:6px 10px;border-radius:8px;cursor:pointer">Cerrar</button>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--green-600)" id="contadorGrande">0</div>
+        <div>
+          <div style="margin-bottom:6px;color:var(--muted)">Kg reciclados esta semana</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="sumarBasura()" style="background:var(--green-600);color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer">+1 kg</button>
+            <button onclick="resetBasura()" style="background:#eee;border:0;padding:8px 12px;border-radius:8px;cursor:pointer">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <hr style="margin:12px 0">
+      <div>
+        <strong>Últimos registros</strong>
+        <div id="miniHist" style="max-height:160px;overflow:auto;margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD (modal grande) -->
+  <div class="modal" id="modalDashboard" aria-hidden="true">
+    <div class="modal-body">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0">Dashboard - Estadísticas EcoSorno</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="downloadCSV()" style="background:#0f172a;color:white;border:0;padding:8px 10px;border-radius:8px;cursor:pointer">Exportar CSV</button>
+          <button onclick="closeDashboard()" style="background:#ff6161;color:white;border:0;padding:8px 10px;border-radius:8px;cursor:pointer">Cerrar</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="panel">
+          <h3>Kg por día (últimos 7 días)</h3>
+          <canvas id="chartWeek"></canvas>
+        </div>
+        <div class="panel">
+          <h3>Kg por tipo (total)</h3>
+          <canvas id="chartTypes"></canvas>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="panel" style="flex:1 1 100%">
+          <h3>Últimos registros</h3>
+          <div style="max-height:260px;overflow:auto">
+            <table id="tablaHist">
+              <thead><tr><th>Fecha</th><th>Punto</th><th>Kg</th><th>Tipo</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+  // ---------------------------
+  // MAPA y MARKERS iniciales
+  // ---------------------------
+  const osornoCoords = [-40.574, -73.133];
+  const map = L.map('map').setView(osornoCoords, 13);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  // Iconos
+  const iconoReciclaje = L.icon({
+    iconUrl: "Reciclaje.png",
+    iconSize: [48,48],
+    iconAnchor: [24,48],
+    popupAnchor: [0,-40]
+  });
+
+  const iconoUsuario = L.icon({
+    iconUrl: "pixel_pim.png",
+    iconSize: [50,50],
+    iconAnchor: [25,25]
+  });
+
+  // Seguimiento real del usuario
+  let marcadorUsuario = null;
+  function iniciarLocalizacion(){
+    if (!navigator.geolocation) return;
+    map.locate({ watch:true, setView:false, maxZoom:16, enableHighAccuracy:true });
+  }
+
+  map.on('locationfound', function(e){
+    if(!marcadorUsuario){
+      marcadorUsuario = L.marker(e.latlng,{icon:iconoUsuario}).addTo(map).bindPopup("Estás aquí 🟢");
+    } else {
+      marcadorUsuario.setLatLng(e.latlng);
+    }
+  });
+
+  map.on('locationerror', function(){ /* no molestar en cada error */ });
+
+  // Centrar en usuario
+  function centrarUsuario(){
+    if(marcadorUsuario) map.setView(marcadorUsuario.getLatLng(), 15);
+    else { iniciarLocalizacion(); alert("Centrando: activa permisos GPS para ver tu ubicación"); }
+  }
+
+  // PUNTOS PREESTABLECIDOS (lista limpia)
+  const puntosBase = [
+    { lat: -40.574303, lng: -73.133102, nombre: "Punto Centro Osorno" },
+    { lat: -40.572112, lng: -73.131512, nombre: "Punto Feria Rahue" },
+    { lat: -40.575801, lng: -73.135903, nombre: "Punto Plaza de Armas" },
+    { lat: -40.58114337784699, lng: -73.11155513238697, nombre: "Punto INACAP Osorno" },
+    { lat: -40.586927, lng: -73.132564, nombre: "Punto Limpio Parque Chuyaca" },
+    { lat: -40.585063, lng: -73.140382, nombre: "Contenedor Parque Cuarto Centenario" },
+    { lat: -40.573911, lng: -73.120239, nombre: "Reciclaje Rahue Alto – Sector Deportivo" },
+    { lat: -40.580091, lng: -73.124948, nombre: "DIRMAAO – Medio Ambiente Osorno" },
+    { lat: -40.589843, lng: -73.130642, nombre: "Contenedor Parque Bellavista" },
+    { lat: -40.576241, lng: -73.118574, nombre: "Punto Reciclaje Francke – Plaza" },
+    { lat: -40.567932, lng: -73.132911, nombre: "Reciclaje Rahue Bajo – Plaza" },
+    { lat: -40.582011, lng: -73.137112, nombre: "Reciclaje Hospital Base Osorno" },
+    { lat: -40.579214, lng: -73.128872, nombre: "Reciclaje Ovejería – Av. Real" },
+    { lat: -40.571094, lng: -73.127503, nombre: "Punto Reciclaje Av. Francia – Multicancha" },
+    { lat: -40.583602, lng: -73.132148, nombre: "Punto Reciclaje Jumbo / Parque Francia" },
+    { lat: -40.578168, lng: -73.134013, nombre: "Reciclaje Parque Pichil" }
+  ];
+
+  // Crear marcadores con iconoRecycle
+  puntosBase.forEach((p, idx) => {
+    const marker = L.marker([p.lat, p.lng], { icon: iconoReciclaje }).addTo(map);
+    // popup con selector de tipo
+    marker.bindPopup(`
+      <b>${p.nombre}</b><br>
+      <label style="font-size:13px">Kg:</label><br>
+      <input id="basura-${idx}" type="number" min="0" placeholder="Kg" style="width:120px;padding:6px;margin-top:6px;border-radius:6px;border:1px solid #ddd"><br>
+      <label style="font-size:13px;margin-top:8px;display:block">Tipo:</label>
+      <select id="tipo-${idx}" style="width:140px;padding:6px;border-radius:6px;margin-top:6px;border:1px solid #ddd">
+        <option value="Plástico">Plástico</option>
+        <option value="Vidrio">Vidrio</option>
+        <option value="Papel">Papel</option>
+        <option value="Otros">Otros</option>
+      </select>
+      <div style="margin-top:8px">
+        <button onclick="guardarBasuraIdx(${idx})" style="background:var(--green-600);color:white;padding:8px 10px;border:0;border-radius:8px;cursor:pointer">Guardar</button>
+      </div>
+    `);
+  });
+
+  // No permitir agregar marcadores por click (bloqueado)
+  map.off('click');
+
+  // ---------------------------
+  // HISTORIAL / LOCALSTORAGE
+  // ---------------------------
+  function getHistorial(){
+    return JSON.parse(localStorage.getItem('basuraHistorial')||'[]');
+  }
+  function setHistorial(arr){
+    localStorage.setItem('basuraHistorial', JSON.stringify(arr));
+  }
+
+  function guardarEnHistorialObj(obj){
+    const historial = getHistorial();
+    historial.push(obj);
+    setHistorial(historial);
+  }
+
+  // Guardar desde popup por índice (simplifica id de input)
+  function guardarBasuraIdx(idx){
+    const kgIn = document.getElementById(`basura-${idx}`);
+    const tipoIn = document.getElementById(`tipo-${idx}`);
+    if(!kgIn) return alert("Abre el popup del punto y escribe un valor");
+    const kg = Number(kgIn.value);
+    const tipo = tipoIn.value || "Otros";
+    if(!kg || kg <= 0) return alert("Ingresa un valor mayor a 0");
+    const punto = puntosBase[idx].nombre;
+    const fecha = new Date().toISOString();
+    guardarEnHistorialObj({ punto, kg, tipo, fecha });
+    actualizarDashboardData();
+    actualizarSemanaResumen();
+    // cerrar popup (si quieres)
+    // encontrar el marker y cerrarlo: no necesario, pero puedes:
+    map.closePopup();
+    alert(`Guardado: ${kg} kg en ${punto} (${tipo})`);
+  }
+
+  // Para compatibilidad: función usada antes por nombre
+  window.guardarBasura = function(lat,lng,nombre){
+    // no usada ahora, pero la dejamos por compatibilidad
+    const obj = { punto:nombre, kg:0, tipo:'Otros', fecha:new Date().toISOString() };
+    guardarEnHistorialObj(obj);
+    actualizarDashboardData();
+    actualizarSemanaResumen();
+  }
+
+  // ---------------------------
+  // ESTADISTICAS & CHARTS
+  // ---------------------------
+  let chartWeek = null;
+  let chartTypes = null;
+
+  // Helper - get last 7 days labels
+  function last7DaysLabels(){
+    const labels=[];
+    for(let i=6;i>=0;i--){
+      const d=new Date(); d.setDate(d.getDate()-i);
+      labels.push(d.toLocaleDateString());
+    }
+    return labels;
+  }
+
+  function buildWeekData(){
+    const labels = last7DaysLabels();
+    const totals = labels.map(l=>{
+      // sum kg for that date (ignore time)
+      const hist = getHistorial();
+      const sum = hist.reduce((acc,item)=>{
+        const itemDate = new Date(item.fecha).toLocaleDateString();
+        if(itemDate===l) return acc + Number(item.kg);
+        return acc;
+      },0);
+      return sum;
+    });
+    return { labels, totals };
+  }
+
+  function buildTypeData(){
+    const hist = getHistorial();
+    const totals = hist.reduce((acc,item)=>{
+      acc[item.tipo] = (acc[item.tipo]||0) + Number(item.kg);
+      return acc;
+    },{});
+    // ensure categories exist:
+    const categories = ['Plástico','Vidrio','Papel','Otros'];
+    return categories.map(c=> totals[c]||0);
+  }
+
+  function renderCharts(){
+    const week = buildWeekData();
+    const types = buildTypeData();
+
+    // week chart
+    const ctxW = document.getElementById('chartWeek').getContext('2d');
+    if(chartWeek) chartWeek.destroy();
+    chartWeek = new Chart(ctxW, {
+      type:'bar',
+      data:{
+        labels: week.labels,
+        datasets:[{
+          label:'Kg reciclados',
+          data: week.totals,
+          backgroundColor: 'rgba(46,139,87,0.85)'
+        }]
+      },
+      options:{responsive:true, maintainAspectRatio:false}
+    });
+
+    // types pie
+    const ctxT = document.getElementById('chartTypes').getContext('2d');
+    if(chartTypes) chartTypes.destroy();
+    chartTypes = new Chart(ctxT,{
+      type:'pie',
+      data:{
+        labels:['Plástico','Vidrio','Papel','Otros'],
+        datasets:[{
+          data: types,
+          backgroundColor:['#f59e0b','#06b6d4','#60a5fa','#9ca3af']
+        }]
+      },
+      options:{responsive:true, maintainAspectRatio:false}
+    });
+  }
+
+  // tabla de historial
+  function renderTable(){
+    const hist = getHistorial().slice().reverse(); // últimos primero
+    const tbody = document.querySelector('#tablaHist tbody');
+    tbody.innerHTML='';
+    hist.forEach(r=>{
+      const tr = document.createElement('tr');
+      const d = new Date(r.fecha);
+      tr.innerHTML = `<td>${d.toLocaleString()}</td><td>${r.punto}</td><td>${r.kg}</td><td>${r.tipo}</td>`;
+      tbody.appendChild(tr);
+    });
+    // mini hist (show last 5)
+    const mini = document.getElementById('miniHist');
+    const last5 = getHistorial().slice(-5).reverse();
+    mini.innerHTML = last5.map(r=>{
+      const d = new Date(r.fecha);
+      return `<div style="padding:6px 0;border-bottom:1px solid #f0f0f0"><strong>${r.kg} kg</strong> · ${r.punto} · <small style="color:${'#6b7280'}">${d.toLocaleString()}</small></div>`;
+    }).join('');
+  }
+
+  function actualizarDashboardData(){
+    renderCharts();
+    renderTable();
+  }
+
+  // semana resumen (text)
+  function actualizarSemanaResumen(){
+    const week = buildWeekData();
+    const totalWeek = week.totals.reduce((a,b)=>a+b,0);
+    document.getElementById('semanaResumen').textContent = `${totalWeek} kg reciclados`;
+    document.getElementById('contadorGrande').textContent = totalWeek;
+  }
+
+  // abrir / cerrar dashboard
+  function openDashboard(){
+    document.getElementById('modalDashboard').classList.add('open');
+    actualizarDashboardData();
+  }
+  function closeDashboard(){
+    document.getElementById('modalDashboard').classList.remove('open');
+  }
+
+  // modales pequeños
+  function openModal(id){ document.getElementById(id).classList.add('open'); iniciarLocalizacion(); }
+  function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+  // sumar contador (solo suma 1 kg)
+  function sumarBasura(){ 
+    // add 1 kg to a "manual" record
+    guardarEnHistorialObj({ punto:'Manual', kg:1, tipo:'Otros', fecha:new Date().toISOString() });
+    actualizarSemanaResumen(); actualizarDashboardData();
+  }
+  function resetBasura(){
+    if(confirm('Reiniciar todos los registros? Esto eliminará historial.')){
+      localStorage.removeItem('basuraHistorial');
+      actualizarSemanaResumen(); actualizarDashboardData();
+    }
+  }
+
+  // Export CSV
+  function downloadCSV(){
+    const hist = getHistorial();
+    if(!hist.length) return alert('No hay datos para exportar');
+    const rows = [['fecha','punto','kg','tipo'], ...hist.map(h=> [h.fecha, `"${h.punto.replace(/"/g,'""')}"`, h.kg, h.tipo])];
+    const csv = rows.map(r=> r.join(',')).join('\n');
+    const blob = new Blob([csv],{type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'ecosorno_historial.csv'; document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // inicializa al cargar
+  (function init(){
+    actualizarSemanaResumen();
+    renderCharts();
+    renderTable();
+    // iniciar geolocalización (pide permiso)
+    iniciarLocalizacion();
+  })();
+
+  // PWA: service worker register if exists
+  if('serviceWorker' in navigator){
+    try { navigator.serviceWorker.register('service-worker.js'); } catch(e) { console.log('sw err',e); }
+  }
+  </script>
+</body>
+</html>
